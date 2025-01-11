@@ -10,3 +10,4 @@ celery
 Redis
 Django-celery-beat
 Django-celery-results
+decouple

@@ -1,11 +1,11 @@
 import pytz
 import requests
+from decouple import config
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlencode
 from datetime import datetime
 from decimal import Decimal
-from decouple import config
 
 ALPHA_VANTAGE_API_KEY = config("ALPHA_VANTAGE_API_KEY", default=None, cast=str)
 
@@ -25,6 +25,7 @@ def transform_alpha_vantage_result(timestamp_str, result):
         'number_of_trades': None,
         'volume': int(result['5. volume']),
         'volume_weighted_average': None,
+        'raw_timestamp': timestamp_str,
         'time': timestamp,
     }
 
