@@ -1,5 +1,5 @@
 Django
-django-timescaledb
+Django-timescaledb
 dj-database-url
 jupyter
 requests
@@ -11,3 +11,5 @@ Redis
 Django-celery-beat
 Django-celery-results
 decouple
+Django-admin-interface
+Django-admin-rangefilter
