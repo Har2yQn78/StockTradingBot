@@ -1,6 +1,5 @@
 import pytz
 import requests
-
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlencode

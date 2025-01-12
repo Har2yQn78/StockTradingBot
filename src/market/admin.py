@@ -4,6 +4,7 @@ except ImportError:
     from backports.zoneinfo import ZoneInfo
 
 from django.contrib import admin
+from datetime import datetime
 from .models import StockQuote, Company
 from django.utils import timezone
 from rangefilter.filters import (
@@ -21,6 +22,15 @@ class StockQuoteAdmin(admin.ModelAdmin):
         'time'
     ]
     readonly_fields = ['localized_time', 'time']
+
+    #def display_raw_time(self, obj):
+    #    data = float(obj.raw_timestamp)
+    #    tz_name = "US/Eastern"
+    #    user_tz = ZoneInfo(tz_name)
+    #    local_time = obj.time.astimezone(user_tz)
+    #    unix_timestamp = data / 1000
+    #    utc_timestamp = datetime.fromtimestamp(unix_timestamp, tz=user_tz)
+    #    return local_time.strftime('%b %d, %Y, %I:%M %p (%Z)')
 
     def localized_time(self, obj):
         tz_name = "US/Eastern"
