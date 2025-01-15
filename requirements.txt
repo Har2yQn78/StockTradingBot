@@ -13,3 +13,4 @@ Django-celery-results
 decouple
 Django-admin-interface
 Django-admin-rangefilter
+openai
