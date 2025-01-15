@@ -4,5 +4,6 @@ nbs/.ipynb_checkpoints/
 .venv/
 .env
 myenv/
+src/db.sqlite3
 
 
