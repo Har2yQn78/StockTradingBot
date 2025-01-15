@@ -9,13 +9,15 @@ from django.db.models import (
     DecimalField,
     Case,
     When,
-    Value
+    Value,
+    StdDev
 )
 from django.db.models.functions import TruncDate, FirstValue, Lag, Coalesce
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 from market.models import StockQuote
+import pandas as pd
 
 
 def get_daily_stock_quotes_queryset(ticker, days=28, use_bucket=False):
@@ -243,44 +245,179 @@ def calculate_rsi(ticker, days=28, queryset=None, period=14):
     }
 
 
+def calculate_macd(ticker, days=None, queryset=None, fast_period=12, slow_period=26, signal_period=9):
+    """
+    Calculate the Moving Average Convergence Divergence (MACD) for a given stock.
+
+    Args:
+        ticker (str): Stock ticker symbol
+        days (int): Number of days to analyze
+        queryset (QuerySet): Optional pre-filtered queryset
+        fast_period (int): Period for fast EMA (default: 12)
+        slow_period (int): Period for slow EMA (default: 26)
+        signal_period (int): Period for signal line (default: 9)
+
+    Returns:
+        dict: MACD indicators including MACD line and signal line
+    """
+
+    if queryset is None:
+        queryset = get_daily_stock_quotes_queryset(ticker, days=days)
+
+    # Get the closing prices in ascending order
+    prices_data = list(queryset.order_by('time').values('close_price'))
+
+    if not prices_data:
+        return None
+
+    # Convert to pandas DataFrame for easier calculation
+    df = pd.DataFrame(prices_data)
+
+    # Calculate EMAs
+    ema_fast = df['close_price'].ewm(span=fast_period, adjust=False).mean()
+    ema_slow = df['close_price'].ewm(span=slow_period, adjust=False).mean()
+
+    # Calculate MACD line
+    macd_line = ema_fast - ema_slow
+
+    # Calculate signal line
+    signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
+
+    # Get the most recent values
+    latest_macd = float(macd_line.iloc[-1])
+    latest_signal = float(signal_line.iloc[-1])
+
+    return {
+        'macd_line': latest_macd,
+        'signal_line': latest_signal,
+        'histogram': latest_macd - latest_signal
+    }
+
+
+def calculate_bollinger_bands(ticker, days=28, period=20, num_std=2, queryset=None):
+    """
+    Calculate Bollinger Bands using Django ORM.
+    """
+    if queryset is None:
+        queryset = get_daily_stock_quotes_queryset(ticker, days=days)
+
+    bb_data = queryset.annotate(
+        sma=Window(
+            expression=Avg('close_price'),
+            order_by=F('time').asc(),
+            frame=RowRange(start=-(period-1), end=0),
+        ),
+        std_dev=Window(
+            expression=StdDev('close_price'),
+            order_by=F('time').asc(),
+            frame=RowRange(start=-(period-1), end=0),
+        )
+    ).annotate(
+        upper_band=ExpressionWrapper(
+            F('sma') + (F('std_dev') * Value(num_std)),
+            output_field=DecimalField(max_digits=10, decimal_places=4)
+        ),
+        lower_band=ExpressionWrapper(
+            F('sma') - (F('std_dev') * Value(num_std)),
+            output_field=DecimalField(max_digits=10, decimal_places=4)
+        )
+    ).order_by('-time').first()
+
+    if not bb_data:
+        return None
+
+    return {
+        'middle_band': float(round(bb_data.sma, 4)),
+        'upper_band': float(round(bb_data.upper_band, 4)),
+        'lower_band': float(round(bb_data.lower_band, 4))
+    }
+
+
 def get_stock_indicators(ticker="AAPL", days=30):
     queryset = get_daily_stock_quotes_queryset(ticker, days=days)
     if queryset.count() == 0:
         raise Exception(f"Data for {ticker} not found")
+
+    # Get all indicators
     averages = get_daily_moving_averages(ticker, days=days, queryset=queryset)
     price_target = get_price_target(ticker, days=days, queryset=queryset)
     volume_trend = get_volume_trend(ticker, days=days, queryset=queryset)
     rsi_data = calculate_rsi(ticker, days=days, period=14)
+    macd_data = calculate_macd(ticker, days=days, queryset=queryset)
+    bollinger_data = calculate_bollinger_bands(ticker, days=days, queryset=queryset)
+
     signals = []
+    signal_weights = {
+        'ma_crossover': 2.0,    # Moving average crossover is a strong signal
+        'price_target': 1.5,    # Price targets are important but less reliable
+        'volume': 1.0,          # Volume confirms other signals
+        'rsi': 1.5,            # RSI is reliable for overbought/oversold
+        'macd': 1.5,           # MACD helps confirm trends
+        'bollinger': 1.0       # Bollinger helps with volatility
+    }
+
+    # Moving Average Signal
     if averages.get('ma_5') > averages.get('ma_20'):
-        signals.append(1)
+        signals.append(1 * signal_weights['ma_crossover'])
     else:
-        signals.append(-1)
+        signals.append(-1 * signal_weights['ma_crossover'])
+
+    # Price Target Signal
     if price_target.get('current_price') < price_target.get('conservative_target'):
-        signals.append(1)
+        signals.append(1 * signal_weights['price_target'])
     else:
-        signals.append(-1)
-    if volume_trend.get("volume_change_percent") > 20:
-        signals.append(1)
-    elif volume_trend.get("volume_change_percent") < -20:
-        signals.append(-1)
+        signals.append(-1 * signal_weights['price_target'])
+
+    # Volume Signal
+    vol_change = volume_trend.get("volume_change_percent")
+    if vol_change > 20:
+        signals.append(1 * signal_weights['volume'])
+    elif vol_change < -20:
+        signals.append(-1 * signal_weights['volume'])
     else:
         signals.append(0)
+
+    # RSI Signal
     rsi = rsi_data.get('rsi')
     if rsi > 70:
-        signals.append(-1)  # Overbought
+        signals.append(-1 * signal_weights['rsi'])
     elif rsi < 30:
-        signals.append(1)  # Oversold
+        signals.append(1 * signal_weights['rsi'])
     else:
         signals.append(0)
+
+    # MACD Signal
+    if macd_data:
+        if macd_data['macd_line'] > 0:
+            signals.append(1 * signal_weights['macd'])
+        else:
+            signals.append(-1 * signal_weights['macd'])
+
+    # Bollinger Bands Signal
+    if bollinger_data:
+        current_price = price_target.get('current_price')
+        if current_price < bollinger_data['lower_band']:
+            signals.append(1 * signal_weights['bollinger'])
+        elif current_price > bollinger_data['upper_band']:
+            signals.append(-1 * signal_weights['bollinger'])
+        else:
+            signals.append(0)
+
+    # Calculate weighted score
+    weighted_score = sum(signals)
+    max_possible_score = sum(signal_weights.values())
+    normalized_score = (weighted_score / max_possible_score) * 10  # Scale to -10 to 10
+
     return {
-        "score": sum(signals),
+        "score": round(normalized_score, 2),
         "ticker": ticker,
         "indicators": {
             **averages,
             **price_target,
             **volume_trend,
             **rsi_data,
-        }
-
+            "macd": macd_data,
+            "bollinger": bollinger_data
+        },
+        "recommendation": "BUY" if normalized_score >= 3 else "SELL" if normalized_score <= -3 else "HOLD"
     }
