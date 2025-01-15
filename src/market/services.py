@@ -70,8 +70,10 @@ def get_daily_moving_averages(ticker, days=28, queryset=None):
     }
 
 
-
 def get_price_target(ticker, days=28, queryset=None):
+    """
+    Simplified price target calculation
+    """
     if queryset is None:
         queryset = get_daily_stock_quotes_queryset(ticker, days=days)
     daily_data = (
@@ -96,8 +98,9 @@ def get_price_target(ticker, days=28, queryset=None):
     avg_price = float(daily_data['avg_price'])
     price_range = float(daily_data['highest']) - float(daily_data['lowest'])
 
-    conservative_target = current_price + (price_range * 0.382)
-    aggressive_target = current_price + (price_range * 0.618)
+    # Simple target based on average price and recent range
+    conservative_target = current_price + (price_range * 0.382)  # 38.2% Fibonacci
+    aggressive_target = current_price + (price_range * 0.618)  # 61.8% Fibonacci
 
     return {
         'current_price': round(current_price, 4),
@@ -108,6 +111,9 @@ def get_price_target(ticker, days=28, queryset=None):
 
 
 def get_volume_trend(ticker, days=28, queryset=None):
+    """
+    Analyze recent volume trends
+    """
     if queryset is None:
         queryset = get_daily_stock_quotes_queryset(ticker=ticker, days=days)
     start = -(days - 1)
@@ -133,7 +139,6 @@ def get_volume_trend(ticker, days=28, queryset=None):
         'latest_volume': int(vol),
         'volume_change_percent': float(volume_change)
     }
-
 
 
 def calculate_rsi(ticker, days=28, queryset=None, period=14):
