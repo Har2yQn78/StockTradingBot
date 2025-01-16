@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
@@ -8,6 +9,13 @@ const nextConfig = {
       },
     ];
   },
+
+  webpack: (config) => {
+    // Add TypeScript extensions if needed
+    config.resolve.extensions.push(".ts", ".tsx");
+    console.log("Alias:", config.resolve.alias); // Debug to check alias paths
+    return config;
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
