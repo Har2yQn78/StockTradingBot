@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import os
 
-import MIDDLEWARE
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,7 +28,7 @@ SECRET_KEY = 'django-insecure-nk14(h3wh$&w%+@9ypr5u(7p-0=d5^^slp_5wu7ucquv5k)w+z
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 # Application definition
 
@@ -46,21 +45,21 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'rangefilter',
-    'rest_framework',
     'corsheaders',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    *MIDDLEWARE,
 ]
+
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@shadcn/ui": "^0.0.4",
     "apexcharts": "^4.3.0",
     "axios": "^1.7.9",
     "highcharts": "^12.1.2",
