@@ -19,4 +19,6 @@ Django-cors-headers
 numpy
 pandas
 salesforce-merlion
+torch
+scikit-learn
 
