@@ -15,3 +15,8 @@ Django-admin-interface
 Django-admin-rangefilter
 openai
 Djangorestframework
+Django-cors-headers
+numpy
+pandas
+salesforce-merlion
+
