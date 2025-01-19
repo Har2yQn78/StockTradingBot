@@ -4,10 +4,11 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import StockQuote, Company
-from .services import get_stock_indicators
+from .services import get_stock_indicators, get_daily_stock_quotes_queryset
 from datetime import datetime, timedelta
 from django.utils import timezone
 from .tasks import sync_company_stock_quotes, sync_historical_stock_data
+from .forecasting import forecast_stock_prices, prepare_historical_data
 
 
 @api_view(['GET'])
@@ -124,3 +125,62 @@ def historical_stock_data(request, ticker):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['GET'])
+def forecast_stock(request, ticker):
+    """
+    API endpoint to forecast stock prices using DeepAR model.
+    """
+    try:
+        # Get query parameters
+        forecast_days = int(request.query_params.get('days', 14))
+        historical_days = int(request.query_params.get('historical_days', 360))
+
+        # Validate parameters
+        if forecast_days <= 0 or forecast_days > 30:
+            return Response(
+                {"error": "Forecast days must be between 1 and 30"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get company
+        company = Company.objects.filter(ticker=ticker).first()
+        if not company:
+            return Response(
+                {"error": f"Ticker {ticker} not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get historical data
+        historical_data_list = get_daily_stock_quotes_queryset(
+            ticker,
+            days=historical_days
+        ).values(
+            'time', 'close_price'
+        )
+
+        if not historical_data_list:
+            return Response(
+                {"error": "No historical data available"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Prepare data and generate forecast
+        historical_df = prepare_historical_data(historical_data_list)
+        forecast_result = forecast_stock_prices(
+            historical_df,
+            forecast_days=forecast_days
+        )
+
+        return Response(forecast_result, status=status.HTTP_200_OK)
+
+    except ValueError as e:
+        return Response(
+            {"error": f"Invalid parameter: {str(e)}"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {"error": f"Forecasting failed: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
