@@ -6,9 +6,11 @@ const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [historicalData, setHistoricalData] = useState([]);
+  const [forecastData, setForecastData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [forecasting, setForecasting] = useState(false);
   const [isSynced, setIsSynced] = useState(false);
 
   const syncStockData = async () => {
@@ -67,7 +69,6 @@ const StockAnalysis = () => {
       }
       const historicalDataRaw = await historicalRes.json();
 
-      // Process historical data to format dates
       const formattedHistoricalData = historicalDataRaw.map((item) => ({
         ...item,
         date: new Date(item.time).toLocaleDateString(),
@@ -82,13 +83,48 @@ const StockAnalysis = () => {
     }
   };
 
+  const fetchForecastData = async () => {
+    if (!ticker) return;
+
+    setForecasting(true);
+    setError('');
+
+    try {
+      const forecastRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/market/forecast/${ticker}/`
+      );
+
+      if (!forecastRes.ok) {
+        const errorMessage = await forecastRes.text();
+        throw new Error(`Forecast Error ${forecastRes.status}: ${errorMessage}`);
+      }
+
+      const forecastData = await forecastRes.json();
+      setForecastData(forecastData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setForecasting(false);
+    }
+  };
+
   // Reset states when ticker changes
   useEffect(() => {
     setIsSynced(false);
     setAnalysis(null);
     setHistoricalData([]);
+    setForecastData(null);
     setError('');
   }, [ticker]);
+
+  // Combine historical and forecast data for the chart
+  const combinedChartData = [
+    ...historicalData,
+    ...(forecastData?.forecast_data?.map(item => ({
+      date: item.date,
+      predicted_price: item.adjusted_price,
+    })) || [])
+  ];
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -118,6 +154,13 @@ const StockAnalysis = () => {
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
           >
             {loading ? 'Loading...' : 'Analyze Stock'}
+          </button>
+          <button
+            onClick={fetchForecastData}
+            disabled={forecasting || !ticker || !isSynced || historicalData.length === 0}
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-400"
+          >
+            {forecasting ? 'Forecasting...' : 'Forecast Stock'}
           </button>
         </div>
       </div>
@@ -152,14 +195,16 @@ const StockAnalysis = () => {
         </div>
       )}
 
-      {historicalData.length > 0 && (
+      {(historicalData.length > 0 || forecastData) && (
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold mb-4">Historical Price Data - {ticker}</h2>
+          <h2 className="text-xl font-bold mb-4">
+            Stock Price History and Forecast - {ticker}
+          </h2>
           <div className="w-full h-[400px]">
             <LineChart
               width={800}
               height={400}
-              data={historicalData}
+              data={combinedChartData}
               margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
@@ -167,15 +212,57 @@ const StockAnalysis = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="close_price" stroke="#8884d8" name="Close Price" />
+              <Line
+                type="monotone"
+                dataKey="close_price"
+                stroke="#8884d8"
+                name="Historical Price"
+                strokeWidth={2}
+              />
               <Line
                 type="monotone"
                 dataKey="volume_weighted_average"
                 stroke="#82ca9d"
                 name="VWAP"
               />
+              {forecastData && (
+                <Line
+                  type="monotone"
+                  dataKey="predicted_price"
+                  stroke="#ff7300"
+                  name="Predicted Price"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                />
+              )}
             </LineChart>
           </div>
+
+          {forecastData && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Forecast Metrics</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-white rounded-lg shadow">
+                  <div className="text-gray-600">Mean Absolute Error</div>
+                  <div className="text-xl font-semibold">
+                    ${forecastData.metrics.mean_absolute_error.toFixed(2)}
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded-lg shadow">
+                  <div className="text-gray-600">Forecast Start</div>
+                  <div className="text-xl font-semibold">
+                    {forecastData.metrics.forecast_start_date}
+                  </div>
+                </div>
+                <div className="p-3 bg-white rounded-lg shadow">
+                  <div className="text-gray-600">Forecast End</div>
+                  <div className="text-xl font-semibold">
+                    {forecastData.metrics.forecast_end_date}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

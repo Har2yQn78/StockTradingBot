@@ -83,7 +83,6 @@ def forecast_stock_prices(historical_data: pd.DataFrame, forecast_days: int = 14
             # Adjust forecasted values by adding MAE to account for systematic bias
             adjusted_forecast["adjusted_close_price"] = adjusted_forecast["close_price"] + np.sqrt(mae)
 
-        # Prepare response
         forecast_data = []
         for timestamp, row in adjusted_forecast.iterrows():
             forecast_data.append({
