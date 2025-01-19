@@ -95,7 +95,7 @@ def historical_stock_data(request, ticker):
     """
     try:
         # Get query parameters
-        days = int(request.query_params.get('days', 90))
+        days = int(request.query_params.get('days', 365))
         should_sync = request.query_params.get('sync', 'false').lower() == 'true'
 
         company = Company.objects.filter(ticker=ticker).first()
@@ -111,7 +111,6 @@ def historical_stock_data(request, ticker):
                 verbose=False
             )
 
-        # Use the existing daily stock quotes function
         historical_data = get_daily_stock_quotes_queryset(
             ticker,
             days=days

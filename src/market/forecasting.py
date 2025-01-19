@@ -14,10 +14,8 @@ def prepare_historical_data(data_list: list) -> pd.DataFrame:
     df.set_index('time', inplace=True)
     df = df[['close_price']]
 
-    # Remove timezone info
     df.index = df.index.tz_localize(None)
 
-    # Handle missing values
     df.fillna(method="ffill", inplace=True)
     df.fillna(method="bfill", inplace=True)
     df.dropna(inplace=True)
@@ -52,26 +50,19 @@ def forecast_stock_prices(historical_data: pd.DataFrame, forecast_days: int = 14
         Dictionary containing forecast results and metrics
     """
     try:
-        # Convert to TimeSeries format
         time_series = TimeSeries.from_pd(historical_data)
-
-        # Create and train model
         model = create_deep_ar_model(forecast_days=forecast_days)
         model.train(time_series)
-
-        # Generate future timestamps
         last_timestamp = historical_data.index[-1]
         future_timestamps = pd.date_range(
             start=last_timestamp,
             periods=forecast_days + 1,
             freq="D"
-        )[1:]  # Exclude the last historical timestamp
+        )[1:]
 
-        # Generate forecast
         forecast, stderr = model.forecast(time_stamps=future_timestamps)
         forecast_df = forecast.to_pd()
 
-        # Calculate error metrics using last week of actual data
         last_actual_values = historical_data["close_price"].iloc[-7:]
         last_forecasted_values = forecast_df["close_price"].iloc[:7]
 
@@ -80,7 +71,6 @@ def forecast_stock_prices(historical_data: pd.DataFrame, forecast_days: int = 14
 
         if len(last_actual_values) == len(last_forecasted_values):
             mae = mean_absolute_error(last_actual_values, last_forecasted_values)
-            # Adjust forecasted values by adding MAE to account for systematic bias
             adjusted_forecast["adjusted_close_price"] = adjusted_forecast["close_price"] + np.sqrt(mae)
 
         forecast_data = []

@@ -9,9 +9,9 @@ const StockAnalysis = () => {
   const [forecastData, setForecastData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistorical, setLoadingHistorical] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [forecasting, setForecasting] = useState(false);
-  const [isSynced, setIsSynced] = useState(false);
 
   const syncStockData = async () => {
     if (!ticker) return;
@@ -30,13 +30,11 @@ const StockAnalysis = () => {
       }
 
       const syncData = await syncRes.json();
-      setIsSynced(true);
 
       // Automatically fetch data after successful sync
       await fetchStockData();
     } catch (err) {
       setError(err.message);
-      setIsSynced(false);
     } finally {
       setSyncing(false);
     }
@@ -46,6 +44,7 @@ const StockAnalysis = () => {
     if (!ticker) return;
 
     setLoading(true);
+    setLoadingHistorical(true);
     setError('');
 
     try {
@@ -80,6 +79,7 @@ const StockAnalysis = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+      setLoadingHistorical(false);
     }
   };
 
@@ -110,19 +110,61 @@ const StockAnalysis = () => {
 
   // Reset states when ticker changes
   useEffect(() => {
-    setIsSynced(false);
     setAnalysis(null);
     setHistoricalData([]);
     setForecastData(null);
     setError('');
   }, [ticker]);
 
+  // Helper function to render analysis data in a table
+  const renderAnalysisTable = (analysis) => {
+    return (
+      <table className="min-w-full bg-white border rounded-lg overflow-hidden">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="px-4 py-2 text-left">Metric</th>
+            <th className="px-4 py-2 text-left">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(analysis).map(([key, value]) => (
+            <React.Fragment key={key}>
+              {typeof value === 'object' && !Array.isArray(value) ? (
+                // Render nested object (e.g., MACD, BOLLINGER)
+                Object.entries(value).map(([subKey, subValue]) => (
+                  <tr key={subKey} className="border-t">
+                    <td className="px-4 py-2 text-gray-600">
+                      {key.replace(/_/g, ' ').toUpperCase()} - {subKey.replace(/_/g, ' ').toUpperCase()}
+                    </td>
+                    <td className="px-4 py-2">
+                      {typeof subValue === 'number' ? subValue.toFixed(2) : subValue.toString()}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // Render top-level properties (e.g., SCORE, TICKER)
+                <tr key={key} className="border-t">
+                  <td className="px-4 py-2 text-gray-600">
+                    {key.replace(/_/g, ' ').toUpperCase()}
+                  </td>
+                  <td className="px-4 py-2">
+                    {typeof value === 'number' ? value.toFixed(2) : value.toString()}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
   // Combine historical and forecast data for the chart
   const combinedChartData = [
     ...historicalData,
     ...(forecastData?.forecast_data?.map(item => ({
       date: item.date,
-      predicted_price: item.adjusted_price,
+      adjusted_price: item.adjusted_price, // Only adjusted_price is used in the chart
     })) || [])
   ];
 
@@ -150,14 +192,14 @@ const StockAnalysis = () => {
           </button>
           <button
             onClick={fetchStockData}
-            disabled={loading || !ticker || !isSynced}
+            disabled={loading || !ticker}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
           >
             {loading ? 'Loading...' : 'Analyze Stock'}
           </button>
           <button
             onClick={fetchForecastData}
-            disabled={forecasting || !ticker || !isSynced || historicalData.length === 0}
+            disabled={forecasting || !ticker || historicalData.length === 0}
             className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-400"
           >
             {forecasting ? 'Forecasting...' : 'Forecast Stock'}
@@ -171,27 +213,16 @@ const StockAnalysis = () => {
         </div>
       )}
 
-      {isSynced && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-          Data successfully synced for {ticker}. You can now analyze the stock.
+      {loadingHistorical && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+          Loading historical data for {ticker}...
         </div>
       )}
 
       {analysis && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold mb-4">Stock Analysis - {ticker}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(analysis).map(([key, value]) => (
-              <div key={key} className="p-4 border rounded-lg">
-                <div className="font-medium text-gray-600">
-                  {key.replace(/_/g, ' ').toUpperCase()}
-                </div>
-                <div className="text-2xl">
-                  {typeof value === 'number' ? value.toFixed(2) : value.toString()}
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderAnalysisTable(analysis)}
         </div>
       )}
 
@@ -200,43 +231,69 @@ const StockAnalysis = () => {
           <h2 className="text-xl font-bold mb-4">
             Stock Price History and Forecast - {ticker}
           </h2>
-          <div className="w-full h-[400px]">
+          <div className="w-full h-[70vh]"> {/* Use viewport height for responsiveness */}
             <LineChart
-              width={800}
-              height={400}
-              data={combinedChartData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                width={window.innerWidth * 0.9}
+                height={window.innerHeight * 0.7}
+                data={combinedChartData}
+                margin={{top: 20, right: 30, left: 20, bottom: 20}}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3"/>
+              <XAxis dataKey="date"/>
+              <YAxis/>
+              <Tooltip/>
+              <Legend/>
               <Line
-                type="monotone"
-                dataKey="close_price"
-                stroke="#8884d8"
-                name="Historical Price"
-                strokeWidth={2}
+                  type="monotone"
+                  dataKey="close_price"
+                  stroke="#8884d8"
+                  name="Historical Price"
+                  strokeWidth={2}
               />
               <Line
-                type="monotone"
-                dataKey="volume_weighted_average"
-                stroke="#82ca9d"
-                name="VWAP"
+                  type="monotone"
+                  dataKey="volume_weighted_average"
+                  stroke="#82ca9d"
+                  name="VWAP"
               />
               {forecastData && (
-                <Line
-                  type="monotone"
-                  dataKey="predicted_price"
-                  stroke="#ff7300"
-                  name="Predicted Price"
-                  strokeDasharray="5 5"
-                  strokeWidth={2}
-                />
+                  <Line
+                      type="monotone"
+                      dataKey="adjusted_price"
+                      stroke="#ff0000"
+                      name="Adjusted Price"
+                      strokeDasharray="3 3"
+                      strokeWidth={2}
+                  />
               )}
             </LineChart>
           </div>
+
+          {forecastData && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2">Forecast Data</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white">
+                    <thead>
+                    <tr>
+                      <th className="px-4 py-2 border">Date</th>
+                      <th className="px-4 py-2 border">Predicted Price</th>
+                      <th className="px-4 py-2 border">Adjusted Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecastData.forecast_data.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2 border">{item.date}</td>
+                        <td className="px-4 py-2 border">${item.predicted_price.toFixed(2)}</td>
+                        <td className="px-4 py-2 border">${item.adjusted_price.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {forecastData && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
