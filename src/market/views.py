@@ -10,7 +10,6 @@ from django.utils import timezone
 from .tasks import sync_company_stock_quotes, sync_historical_stock_data
 
 
-
 @api_view(['GET'])
 def sync_data(request, ticker):
     """
@@ -124,3 +123,4 @@ def historical_stock_data(request, ticker):
         return Response(list(historical_data), status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
