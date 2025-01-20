@@ -33,7 +33,7 @@ def create_deep_ar_model(n_past: int = 7, forecast_days: int = 14) -> DeepARFore
         num_layers=2,
         learning_rate=0.0001,
         batch_size=16,
-        num_epochs=11
+        num_epochs=10
     )
     return DeepARForecaster(config=config)
 

@@ -12,6 +12,8 @@ const StockAnalysis = () => {
   const [loadingHistorical, setLoadingHistorical] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [forecasting, setForecasting] = useState(false);
+  const [syncYears, setSyncYears] = useState(1); // Default to 1 year
+  const [historicalDays, setHistoricalDays] = useState(365); // Default to 365 days
 
   const syncStockData = async () => {
     if (!ticker) return;
@@ -21,7 +23,7 @@ const StockAnalysis = () => {
 
     try {
       const syncRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/market/sync/${ticker}/?force=true`
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/market/sync/${ticker}/?years_ago=${syncYears}`
       );
 
       if (!syncRes.ok) {
@@ -60,7 +62,7 @@ const StockAnalysis = () => {
 
       // Fetch historical data
       const historicalRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/market/historical/${ticker}/`
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/market/historical/${ticker}/?days=${historicalDays}`
       );
       if (!historicalRes.ok) {
         const errorMessage = await historicalRes.text();
@@ -171,7 +173,7 @@ const StockAnalysis = () => {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col space-y-4">
-        <Link href="/" className="text-blue-500 hover:text-blue-600">
+        <Link href="/front/src/public" className="text-blue-500 hover:text-blue-600">
           ← Back to Home
         </Link>
 
@@ -183,6 +185,15 @@ const StockAnalysis = () => {
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <select
+            value={syncYears}
+            onChange={(e) => setSyncYears(parseInt(e.target.value))}
+            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={1}>1 Year</option>
+            <option value={2}>2 Years</option>
+            <option value={3}>3 Years</option>
+          </select>
           <button
             onClick={syncStockData}
             disabled={syncing || !ticker}
@@ -190,6 +201,13 @@ const StockAnalysis = () => {
           >
             {syncing ? 'Syncing...' : 'Sync Data'}
           </button>
+          <input
+            type="number"
+            placeholder="Days for Historical Data"
+            value={historicalDays}
+            onChange={(e) => setHistoricalDays(parseInt(e.target.value))}
+            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <button
             onClick={fetchStockData}
             disabled={loading || !ticker}

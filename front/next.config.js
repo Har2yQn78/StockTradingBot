@@ -1,6 +1,7 @@
-import { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
 
-const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
@@ -12,12 +13,12 @@ const nextConfig: NextConfig = {
 
   webpack: (config) => {
     // Add TypeScript extensions if needed
-    config.resolve.extensions.push(".ts", ".tsx");
-    console.log("Alias:", config.resolve.alias);
+    config.resolve.extensions.push('.ts', '.tsx');
+    console.log('Alias:', config.resolve.alias);
     return config;
   },
 
   transpilePackages: ['recharts'],
 };
 
-export default nextConfig;
+module.exports = nextConfig;

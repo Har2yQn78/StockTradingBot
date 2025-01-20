@@ -17,14 +17,13 @@ def sync_data(request, ticker):
     API endpoint to sync historical stock data for a ticker.
     """
     try:
-        # Verify API key is configured
+        years_ago = int(request.query_params.get('years_ago', 1))
         api_key = config("POLOGYON_API_KEY", default=None, cast=str)
         if not api_key:
             return Response({
                 "error": "Polygon API key is not configured"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Basic connectivity test
         import urllib3
         http = urllib3.PoolManager()
         try:
@@ -38,17 +37,15 @@ def sync_data(request, ticker):
                 "error": f"Connection to Polygon API failed. Please check your internet connection and DNS settings. Details: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Get or create company
         company = Company.objects.filter(ticker=ticker).first()
         if not company:
             company = Company.objects.create(ticker=ticker.upper())
 
-        # Directly call sync_historical_stock_data
         sync_historical_stock_data(
-            years_ago=1,  # Fetch data for the last year
+            years_ago=years_ago,
             company_ids=[company.id],
             use_celery=False,
-            verbose=True  # Enable verbose output for debugging
+            verbose=True
         )
 
         return Response({
@@ -94,7 +91,6 @@ def historical_stock_data(request, ticker):
     API endpoint to fetch daily historical stock data.
     """
     try:
-        # Get query parameters
         days = int(request.query_params.get('days', 365))
         should_sync = request.query_params.get('sync', 'false').lower() == 'true'
 
@@ -103,7 +99,6 @@ def historical_stock_data(request, ticker):
             return Response({"error": f"Ticker {ticker} not found"}, status=status.HTTP_404_NOT_FOUND)
 
         if should_sync:
-            # Sync data before fetching
             sync_historical_stock_data(
                 years_ago=1,
                 company_ids=[company.id],
@@ -140,7 +135,7 @@ def forecast_stock(request, ticker):
     """
     try:
         forecast_days = int(request.query_params.get('days', 14))
-        historical_days = int(request.query_params.get('historical_days', 360))
+        historical_days = int(request.query_params.get('historical_days', 365))
 
         if forecast_days <= 0 or forecast_days > 30:
             return Response(
@@ -186,5 +181,4 @@ def forecast_stock(request, ticker):
             {"error": f"Forecasting failed: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
