@@ -7,5 +7,6 @@ myenv/
 src/db.sqlite3
 front/.env.local
 get-pip.py
+sp500data/
 
 
