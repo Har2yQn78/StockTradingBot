@@ -181,4 +181,3 @@ def forecast_stock(request, ticker):
             {"error": f"Forecasting failed: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
