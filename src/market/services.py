@@ -17,7 +17,9 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 from market.models import StockQuote
+from django.db.models import Max
 import pandas as pd
+from timescale.db.models.expressions import TimeBucket
 
 
 def get_daily_stock_quotes_queryset(ticker, days=28, use_bucket=False):
@@ -40,6 +42,38 @@ def get_daily_stock_quotes_queryset(ticker, days=28, use_bucket=False):
     )
     if use_bucket:
         return qs.time_bucket('time', '1 day')
+    return qs
+
+
+def get_5min_stock_quotes_queryset(ticker, days=28, use_bucket=False):
+    now = timezone.now()
+    start_date = now - timedelta(days=days)
+    end_date = now
+
+    buffer_start = start_date - timedelta(days=2)
+
+    latest_5min_timestamps = (
+        StockQuote.objects.filter(
+            company__ticker=ticker,
+            time__range=(buffer_start, end_date)
+        )
+        .annotate(bucket=TimeBucket('time', '5 minutes'))
+        .values('company', 'bucket')
+        .annotate(latest_time=Max('time'))
+        .values('company', 'bucket', 'latest_time')
+        .order_by('bucket')
+    )
+
+    actual_timestamps = [x['latest_time'] for x in latest_5min_timestamps]
+
+    qs = StockQuote.timescale.filter(
+        company__ticker=ticker,
+        time__range=(start_date, end_date),
+        time__in=actual_timestamps
+    )
+
+    if use_bucket:
+        return qs.time_bucket('time', '5 minutes')
     return qs
 
 
