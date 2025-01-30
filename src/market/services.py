@@ -455,3 +455,4 @@ def get_stock_indicators(ticker="AAPL", days=30):
         },
         "recommendation": "BUY" if normalized_score >= 3 else "SELL" if normalized_score <= -3 else "HOLD"
     }
+
