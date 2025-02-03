@@ -1,5 +1,7 @@
 # created by virtualenv automatically
 nbs/.ipynb_checkpoints/
+agents/.ipynb_checkpoints/
+agents/catboost_info/
 .idea/
 .venv/
 .env
